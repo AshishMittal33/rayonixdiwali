@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using UnityEditor.Events;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -141,7 +142,17 @@ namespace RayonixAR.Editor
             so.FindProperty("trackerCamera").objectReferenceValue = cam;
             so.FindProperty("mode").enumValueIndex = (int)WorldTracker.TrackingMode.MODE_6DOF;
             so.FindProperty("usePlacementIndicator").boolValue = true;
+            // Stability tuning: smoother placement phase, more tracking budget, shorter placement range
+            so.FindProperty("s3dof.useExtraSmoothing").boolValue = true;
+            so.FindProperty("s3dof.smoothenFactor").floatValue = 10f;
+            so.FindProperty("s6dof.maxPixels").intValue = 550;
+            so.FindProperty("s6dof.maxPoints").intValue = 160;
+            so.FindProperty("placementIndicatorSettings.minZ").floatValue = 0.5f;
+            so.FindProperty("placementIndicatorSettings.maxZ").floatValue = 3f;
+            so.FindProperty("placeAtIndicatorDistance").boolValue = true;
             so.ApplyModifiedProperties();
+
+            ConfigureInteractionAndSmoothing(trackerGo, tracker, cam);
 
             // Use the new Input System UI module so the Place / Reset buttons work in every input mode
             var eventSystem = UnityEngine.Object.FindFirstObjectByType<EventSystem>(FindObjectsInactive.Include);
@@ -175,6 +186,43 @@ namespace RayonixAR.Editor
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             AssetDatabase.SaveAssets();
             Debug.Log("[RayonixAR] Created " + ScenePath + " and set it as the only scene in Build Settings.");
+        }
+
+        /// <summary>
+        /// Drops two-finger pan (dragging the object away from the origin makes 6DOF drift badly),
+        /// routes the Place button through PlaceOriginAtIndicator, and adds pose smoothing.
+        /// </summary>
+        private static void ConfigureInteractionAndSmoothing(GameObject trackerGo, WorldTracker tracker, Camera cam)
+        {
+            var pan = trackerGo.GetComponent<TwoFingerPan>();
+
+            foreach (var button in UnityEngine.Object.FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var onClick = button.onClick;
+                for (int i = onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+                {
+                    var target = onClick.GetPersistentTarget(i);
+                    var method = onClick.GetPersistentMethodName(i);
+                    if (pan != null && target == pan)
+                    {
+                        UnityEventTools.RemovePersistentListener(onClick, i);
+                    }
+                    else if (target == tracker && method == "PlaceOrigin")
+                    {
+                        UnityEventTools.RemovePersistentListener(onClick, i);
+                        UnityEventTools.AddPersistentListener(onClick, tracker.PlaceOriginAtIndicator);
+                    }
+                }
+            }
+
+            if (pan != null) UnityEngine.Object.DestroyImmediate(pan);
+
+            var smoother = trackerGo.AddComponent<TrackingSmoother>();
+            var sso = new SerializedObject(smoother);
+            sso.FindProperty("tracker").objectReferenceValue = tracker;
+            sso.FindProperty("cameraTransform").objectReferenceValue = cam.transform;
+            sso.FindProperty("scaledObject").objectReferenceValue = tracker.mainObject != null ? tracker.mainObject.transform : null;
+            sso.ApplyModifiedProperties();
         }
 
         private static void ReplaceTmpLabelsWithLegacyText()
