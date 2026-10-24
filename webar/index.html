@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Rayonix Diwali AR</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+    #hint {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+      padding: 12px 16px; color: #fff; background: rgba(0,0,0,.55);
+      font-size: 14px; text-align: center;
+    }
+    #hint a { color: #ffd166; }
+    .a-enter-vr, .a-loader-title { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="hint">
+    Point the camera at the <a href="marker.html" target="_blank">Hiro marker</a> to light the diya.
+  </div>
+
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true; colorManagement: true"
+    arjs="sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; debugUIEnabled: false;">
+
+    <a-assets>
+      <a-mixin id="spark" geometry="primitive: sphere; radius: 0.03"
+               material="color: #ffd166; emissive: #ffb703; emissiveIntensity: 1.2; shader: standard"></a-mixin>
+    </a-assets>
+
+    <a-marker preset="hiro">
+      <a-entity id="diya" position="0 0 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear">
+
+        <!-- Clay bowl -->
+        <a-cylinder position="0 0.12 0" radius="0.45" height="0.24"
+                    material="color: #b5532a; roughness: 0.9"></a-cylinder>
+        <a-cylinder position="0 0.25 0" radius="0.5" height="0.04"
+                    material="color: #c9623a; roughness: 0.9"></a-cylinder>
+        <a-cylinder position="0 0.26 0" radius="0.4" height="0.02"
+                    material="color: #e9a23b; metalness: 0.4; roughness: 0.3"></a-cylinder>
+
+        <!-- Wick -->
+        <a-cylinder position="0 0.33 0" radius="0.03" height="0.14" material="color: #333"></a-cylinder>
+
+        <!-- Flame -->
+        <a-entity position="0 0.5 0">
+          <a-cone radius-bottom="0.12" radius-top="0" height="0.36"
+                  material="color: #ff9f1c; emissive: #ff6d00; emissiveIntensity: 1.5; opacity: 0.95; transparent: true"
+                  animation="property: scale; from: 1 1 1; to: 1.15 1.3 1.15; dir: alternate; loop: true; dur: 450; easing: easeInOutSine"></a-cone>
+          <a-cone position="0 -0.04 0" radius-bottom="0.06" radius-top="0" height="0.2"
+                  material="color: #fff3b0; emissive: #ffe066; emissiveIntensity: 2; opacity: 0.9; transparent: true"
+                  animation="property: scale; from: 1 1 1; to: 0.9 1.25 0.9; dir: alternate; loop: true; dur: 380; easing: easeInOutSine"></a-cone>
+          <a-light type="point" color="#ffb347" intensity="1.4" distance="3" decay="2"
+                   animation="property: intensity; from: 1.1; to: 1.7; dir: alternate; loop: true; dur: 300"></a-light>
+        </a-entity>
+
+        <!-- Floating sparks -->
+        <a-entity mixin="spark" position="0.5 0.6 0.2"
+                  animation="property: position; to: 0.6 1.3 0.1; loop: true; dur: 2200; easing: easeOutQuad"
+                  animation__fade="property: material.opacity; from: 1; to: 0; loop: true; dur: 2200"></a-entity>
+        <a-entity mixin="spark" position="-0.4 0.5 -0.3"
+                  animation="property: position; to: -0.6 1.2 -0.2; loop: true; dur: 2600; easing: easeOutQuad"
+                  animation__fade="property: material.opacity; from: 1; to: 0; loop: true; dur: 2600"></a-entity>
+        <a-entity mixin="spark" position="0.1 0.6 -0.5"
+                  animation="property: position; to: 0.2 1.4 -0.6; loop: true; dur: 1900; easing: easeOutQuad"
+                  animation__fade="property: material.opacity; from: 1; to: 0; loop: true; dur: 1900"></a-entity>
+
+        <!-- Greeting -->
+        <a-text value="Happy Diwali" align="center" position="0 1.25 0" width="3"
+                color="#ffd166" font="mozillavr"
+                animation="property: position; from: 0 1.2 0; to: 0 1.3 0; dir: alternate; loop: true; dur: 1800; easing: easeInOutSine"></a-text>
+      </a-entity>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+</body>
+</html>
