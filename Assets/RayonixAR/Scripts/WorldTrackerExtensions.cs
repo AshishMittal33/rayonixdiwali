@@ -25,6 +25,16 @@ namespace Imagine.WebAR
         }
 
         /// <summary>
+        /// Limits how near and far the placement arrow can be, in metres along the floor. A larger
+        /// minimum stops the arrow from sitting under the user's feet when the device points down.
+        /// </summary>
+        public void SetPlacementRange(float minZ, float maxZ)
+        {
+            placementIndicatorSettings.minZ = minZ;
+            placementIndicatorSettings.maxZ = Mathf.Max(minZ, maxZ);
+        }
+
+        /// <summary>
         /// Same as PlaceOrigin, but first tells the tracker how far away the placement arrow is, so the
         /// object appears on the floor where the user pointed rather than a fixed distance ahead.
         /// </summary>

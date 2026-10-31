@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -21,6 +22,10 @@ namespace RayonixAR.Room
     public class RoomConfigurator : MonoBehaviour
     {
         private const float TvHeight = 1.2f;        // TV mounting height above the floor
+        private const float PlacementMinZ = 1.0f;   // placement arrow at least this far ahead (plugin default 0.5)
+        private const float PlacementMaxZ = 3.5f;
+        /// <summary>Imagine turns MainObject to face the camera 0.25 s after placing; spawn after that.</summary>
+        private const float AfterPlaceDelay = 0.35f;
         private const float SlotClearance = 0.45f;  // a spawn slot is taken if an item is closer than this
 
         /// <summary>
@@ -96,8 +101,14 @@ namespace RayonixAR.Room
 
         private string shownStatus;
         private string shownGuide;
+        private bool placingForSpawn;
 
         // ------------------------------------------------------------------ lifecycle
+
+        private void Start()
+        {
+            if (tracker != null) tracker.SetPlacementRange(PlacementMinZ, PlacementMaxZ);
+        }
 
         private void OnEnable()
         {
@@ -231,10 +242,32 @@ namespace RayonixAR.Room
 
         // ------------------------------------------------------------------ placement maths (itemRoot local space)
 
+        /// <summary>
+        /// Adds an item. Before the origin is placed, this first places it where the arrow points,
+        /// so one tap on TV, Chair or Table does both.
+        /// </summary>
         private void Spawn(RoomItem prefab)
         {
-            if (prefab == null || itemRoot == null || arCamera == null || tracker == null || !tracker.IsPlaced) return;
+            if (prefab == null || itemRoot == null || arCamera == null || tracker == null || placingForSpawn) return;
+            if (!tracker.IsPlaced)
+            {
+                tracker.PlaceOriginAtIndicator();
+                StartCoroutine(SpawnAfterPlacement(prefab));
+                return;
+            }
+            SpawnNow(prefab);
+        }
 
+        private IEnumerator SpawnAfterPlacement(RoomItem prefab)
+        {
+            placingForSpawn = true;
+            yield return new WaitForSeconds(AfterPlaceDelay);
+            placingForSpawn = false;
+            if (tracker.IsPlaced) SpawnNow(prefab);
+        }
+
+        private void SpawnNow(RoomItem prefab)
+        {
             // Imagine's 6DOF frame has the placed origin at (0,0,0) on the floor, but the camera is
             // NOT above the floor (Place_6DOF puts it at y = 0, and depth is expressed by scaling
             // MainObject). So items go at and around the origin, never relative to camera height.
@@ -490,13 +523,14 @@ namespace RayonixAR.Room
 
         private void UpdateUi(bool placed)
         {
-            if (cataloguePanel != null) cataloguePanel.SetActive(placed && selected == null);
+            // The catalogue shows before placing too: tapping an item places the origin and adds it.
+            if (cataloguePanel != null) cataloguePanel.SetActive(selected == null && !placingForSpawn);
             if (itemPanel != null) itemPanel.SetActive(placed && selected != null);
 
             string status = placed ? "Tracking" : "Find the floor";
             string guide;
             if (!placed)
-                guide = "Point the arrow at the floor spot for your furniture (for a TV: the bottom of the wall), then tap Place.";
+                guide = "Point the arrow at the floor spot for your furniture (for a TV: the bottom of the wall), then tap TV, Chair or Table.";
             else if (selected == null)
                 guide = items.Count == 0 ? "Add a TV, chair or table. It appears on the spot you placed." : "Tap an item to adjust it.";
             else if (new Vector2(selected.transform.localPosition.x, selected.transform.localPosition.z).magnitude > StableRadius)
