@@ -102,8 +102,18 @@ namespace RayonixAR.Room
         private string shownStatus;
         private string shownGuide;
         private bool placingForSpawn;
+        private string error;
 
         // ------------------------------------------------------------------ lifecycle
+
+        private void Awake()
+        {
+            // The scene's prefab links can be lost when the scene is regenerated, so fall back to the
+            // copies in Resources/RoomItems rather than letting the add buttons silently do nothing.
+            if (tvPrefab == null) tvPrefab = Resources.Load<RoomItem>("RoomItems/TV");
+            if (chairPrefab == null) chairPrefab = Resources.Load<RoomItem>("RoomItems/Chair");
+            if (tablePrefab == null) tablePrefab = Resources.Load<RoomItem>("RoomItems/Table");
+        }
 
         private void Start()
         {
@@ -248,7 +258,14 @@ namespace RayonixAR.Room
         /// </summary>
         private void Spawn(RoomItem prefab)
         {
-            if (prefab == null || itemRoot == null || arCamera == null || tracker == null || placingForSpawn) return;
+            if (placingForSpawn) return;
+            if (prefab == null || itemRoot == null || arCamera == null || tracker == null)
+            {
+                error = prefab == null ? "This model is missing from the build." : "The AR scene is not set up correctly.";
+                Debug.LogError("[RoomAR] Cannot add item: " + error);
+                return;
+            }
+            error = null;
             if (!tracker.IsPlaced)
             {
                 tracker.PlaceOriginAtIndicator();
@@ -529,7 +546,9 @@ namespace RayonixAR.Room
 
             string status = placed ? "Tracking" : "Find the floor";
             string guide;
-            if (!placed)
+            if (error != null)
+                guide = error;
+            else if (!placed)
                 guide = "Point the arrow at the floor spot for your furniture (for a TV: the bottom of the wall), then tap TV, Chair or Table.";
             else if (selected == null)
                 guide = items.Count == 0 ? "Add a TV, chair or table. It appears on the spot you placed." : "Tap an item to adjust it.";

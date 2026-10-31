@@ -31,7 +31,7 @@ namespace RayonixAR.RoomSetup
         private const string Root = "Assets/RayonixAR/Room";
         private const string MaterialDir = Root + "/Materials";
         private const string TextureDir = Root + "/Textures";
-        private const string PrefabDir = Root + "/Prefabs";
+        private const string PrefabDir = Root + "/Resources/RoomItems"; // Resources: RoomConfigurator loads these by name
         private const string ScenePath = "Assets/Scenes/RoomConfigurator.unity";
         private const string BuildDir = "Builds/RoomWebGL";
         private const string WebDir = "webar/room";
@@ -193,7 +193,7 @@ namespace RayonixAR.RoomSetup
             var path = PrefabDir + "/" + item.label + ".prefab";
             var saved = PrefabUtility.SaveAsPrefabAsset(item.gameObject, path);
             UnityEngine.Object.DestroyImmediate(item.gameObject);
-            return saved.GetComponent<RoomItem>();
+            return saved != null ? AssetDatabase.LoadAssetAtPath<RoomItem>(path) : null;
         }
 
         private static Material LitMaterial(string name, Color color, float smoothness, float metallic, Texture2D map)
