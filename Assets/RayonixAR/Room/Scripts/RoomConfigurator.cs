@@ -20,9 +20,19 @@ namespace RayonixAR.Room
     /// </summary>
     public class RoomConfigurator : MonoBehaviour
     {
-        private const float SpawnDistance = 1.2f;   // metres in front of the camera when not looking at the floor
-        private const float FloorRayMax = 4f;       // ignore floor points further than this
         private const float TvHeight = 1.2f;        // TV mounting height above the floor
+        private const float SlotClearance = 0.45f;  // a spawn slot is taken if an item is closer than this
+
+        /// <summary>
+        /// Where new items go, in metres relative to the placed origin as the user sees it:
+        /// x = to the right, y = further away. The first free slot is used.
+        /// </summary>
+        private static readonly Vector2[] SpawnSlots =
+        {
+            new Vector2(0f, 0f), new Vector2(0.9f, 0f), new Vector2(-0.9f, 0f),
+            new Vector2(0f, 0.9f), new Vector2(0.9f, 0.9f), new Vector2(-0.9f, 0.9f),
+            new Vector2(0f, -0.7f), new Vector2(0.9f, -0.7f), new Vector2(-0.9f, -0.7f),
+        };
         private const float StepMetres = 0.05f;
         private const float StepDegrees = 10f;
         private const float StepScale = 1.1f;
@@ -225,27 +235,22 @@ namespace RayonixAR.Room
         {
             if (prefab == null || itemRoot == null || arCamera == null || tracker == null || !tracker.IsPlaced) return;
 
+            // Imagine's 6DOF frame has the placed origin at (0,0,0) on the floor, but the camera is
+            // NOT above the floor (Place_6DOF puts it at y = 0, and depth is expressed by scaling
+            // MainObject). So items go at and around the origin, never relative to camera height.
             var camPos = CameraLocalPosition();
-            var camDir = itemRoot.InverseTransformDirection(arCamera.transform.forward).normalized;
             var forward = CameraLocalForward();
+            var right = Vector3.Cross(Vector3.up, forward);
 
-            // Put it where the camera looks at the floor, or a fixed distance ahead when looking level.
-            Vector3 position;
-            var floor = new Plane(Vector3.up, Vector3.zero);
-            var ray = new Ray(camPos, camDir);
-            if (floor.Raycast(ray, out float enter) && enter < FloorRayMax)
-                position = ray.GetPoint(enter);
-            else
-                position = camPos + forward * SpawnDistance;
-            position.y = 0f;
-
-            // Keep new items near the tracked origin, where Imagine's 6DOF tracking is steadiest.
-            var flat = new Vector2(position.x, position.z);
-            if (flat.magnitude > StableRadius)
+            var position = Vector3.zero;
+            foreach (var slot in SpawnSlots)
             {
-                flat = flat.normalized * StableRadius;
-                position.x = flat.x;
-                position.z = flat.y;
+                var candidate = right * slot.x + forward * slot.y;
+                if (!IsSlotTaken(candidate, prefab.wallItem))
+                {
+                    position = candidate;
+                    break;
+                }
             }
             if (prefab.wallItem) position.y = TvHeight;
 
@@ -261,6 +266,18 @@ namespace RayonixAR.Room
             items.Add(item);
             PushUndo(UndoType.Add, item);
             Select(item);
+        }
+
+        /// <summary>True if another item of the same kind of placement (wall or floor) stands near this spot.</summary>
+        private bool IsSlotTaken(Vector3 spot, bool wall)
+        {
+            foreach (var item in items)
+            {
+                if (item == null || item.wallItem != wall) continue;
+                var p = item.transform.localPosition;
+                if (new Vector2(p.x - spot.x, p.z - spot.z).magnitude < SlotClearance) return true;
+            }
+            return false;
         }
 
         /// <summary>Moves the selected item along the user's right (x), up (y) and forward (z).</summary>
@@ -479,9 +496,9 @@ namespace RayonixAR.Room
             string status = placed ? "Tracking" : "Find the floor";
             string guide;
             if (!placed)
-                guide = "Point at the floor where your items should go, move the tablet slowly, then tap Place.";
+                guide = "Point the arrow at the floor spot for your furniture (for a TV: the bottom of the wall), then tap Place.";
             else if (selected == null)
-                guide = items.Count == 0 ? "Add a TV, chair or table. It appears in front of you." : "Tap an item to adjust it.";
+                guide = items.Count == 0 ? "Add a TV, chair or table. It appears on the spot you placed." : "Tap an item to adjust it.";
             else if (new Vector2(selected.transform.localPosition.x, selected.transform.localPosition.z).magnitude > StableRadius)
                 guide = "Far from the placement point: tracking is less steady here. Keep items within about 1.5 m.";
             else if (selected.wallItem)
